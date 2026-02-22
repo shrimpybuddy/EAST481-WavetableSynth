@@ -1,9 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <JUCERPROJECT id="uA5FiO" name="WavetableSynth" projectType="audioplug" useAppConfig="0"
-              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1">
+              addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginIsSynth,pluginWantsMidiIn">
   <MAINGROUP id="e04AqB" name="WavetableSynth">
     <GROUP id="{1F693134-C0A7-1FF7-AFE4-942CA61B3C0F}" name="Source">
+      <FILE id="yDOnVN" name="WavetableOsc.cpp" compile="1" resource="0"
+            file="Source/WavetableOsc.cpp"/>
+      <FILE id="eU4pfs" name="WavetableOsc.h" compile="0" resource="0" file="Source/WavetableOsc.h"/>
+      <FILE id="JhL3E0" name="WavetableSynth.cpp" compile="1" resource="0"
+            file="Source/WavetableSynth.cpp"/>
+      <FILE id="IZjXLn" name="WavetableSynth.h" compile="0" resource="0"
+            file="Source/WavetableSynth.h"/>
       <FILE id="gQ5Gyc" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>
       <FILE id="XhexSB" name="PluginProcessor.h" compile="0" resource="0"

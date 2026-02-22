@@ -19,9 +19,10 @@ WavetableSynthAudioProcessor::WavetableSynthAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ), synth(WavetableSynth(getSampleRate()))
+    
 #endif
-{
+{ 
 }
 
 WavetableSynthAudioProcessor::~WavetableSynthAudioProcessor()
@@ -93,8 +94,8 @@ void WavetableSynthAudioProcessor::changeProgramName (int index, const juce::Str
 //==============================================================================
 void WavetableSynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
+	this->synth.setSampleRate(sampleRate);
+    this->synth.initOscs();
 }
 
 void WavetableSynthAudioProcessor::releaseResources()
@@ -132,24 +133,25 @@ bool WavetableSynthAudioProcessor::isBusesLayoutSupported (const BusesLayout& la
 void WavetableSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    
+
+	buffer.clear();
+
+    int currentSample = 0;
+
+    //render and repalce audio buffer in between each midi event 
     for(const auto midiMessage : midiMessages)
     {
-        const auto message = midiMessage.getMessage();
+        const auto event = midiMessage.getMessage();
+        const int eventSample = static_cast<int>(midiMessage.samplePosition);//returns number of samples from the start
+
+        synth.renderAndAppend(buffer, currentSample, eventSample);
+        synth.handleMidiEvent(event);
+
+        currentSample = eventSample;
+
         
-        if (message.isNoteOn())
-        {
-            auto noteNumber = message.getNoteNumber();
-			auto frequency = juce::MidiMessage::getMidiNoteInHertz(noteNumber);
-            auto velocity = message.getVelocity();
-
-        }
-        else if (message.isNoteOff())
-        {
-            auto noteNumber = message.getNoteNumber();
-		}
 	}
-
+    synth.renderAndAppend(buffer, currentSample, buffer.getNumSamples());
 }
 
 //==============================================================================
