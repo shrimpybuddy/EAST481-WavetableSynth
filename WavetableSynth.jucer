@@ -18,6 +18,8 @@
       <FILE id="gSaU3U" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
       <FILE id="NfHYPF" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
+      <FILE id="Gkz9A7" name="Adsr.cpp" compile="1" resource="0" file="Source/Adsr.cpp"/>
+      <FILE id="ZskMpe" name="Adsr.h" compile="0" resource="0" file="Source/Adsr.h"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>

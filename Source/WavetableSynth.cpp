@@ -1,4 +1,5 @@
 #include "WavetableSynth.h"
+#include <cmath>
 WavetableSynth::WavetableSynth(double sr) :
 	sampleRate(sr)
 {}
@@ -57,10 +58,21 @@ void WavetableSynth::renderAndAppend(juce::AudioBuffer<float>& buffer, int curre
 
 	//render audio from current sample to event sample
 	for (int sample = currentSample; sample < eventSample; sample++) {
+
+		float i = 0; //keep track of how many oscillators are playing for normalization
+
+		for (auto& osc : oscillators) {
+			if (osc.isPlaying()) {
+				i++;
+			}
+		}
+		i = sqrt(i); //normalize by square root of number of oscillators playing
+
 		float output = 0.0f;
 		for (auto& osc : oscillators) {
 			if (osc.isPlaying()) {
-				output += osc.getSample();
+				i++;
+				output += (osc.getSample()/i);
 			}
 		}
 
