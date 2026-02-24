@@ -19,10 +19,14 @@ WavetableSynthAudioProcessor::WavetableSynthAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       ), synth(WavetableSynth(getSampleRate()))
+                       ), synth()
     
 #endif
 { 
+	attackParam = apvts.getRawParameterValue("attack");
+	decayParam = apvts.getRawParameterValue("decay");
+	sustainParam = apvts.getRawParameterValue("sustain");
+	releaseParam = apvts.getRawParameterValue("release");
 }
 
 WavetableSynthAudioProcessor::~WavetableSynthAudioProcessor()
@@ -94,8 +98,10 @@ void WavetableSynthAudioProcessor::changeProgramName (int index, const juce::Str
 //==============================================================================
 void WavetableSynthAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-	this->synth.setSampleRate(sampleRate);
-    this->synth.initOscs();
+    adsrParams = juce::ADSR::Parameters(attackParam->load(), decayParam->load(), sustainParam->load(), releaseParam->load());
+	synth.setSampleRate(sampleRate);
+	synth.setAdsrParams(adsrParams);
+    synth.initOscs();
 }
 
 void WavetableSynthAudioProcessor::releaseResources()
@@ -144,12 +150,21 @@ void WavetableSynthAudioProcessor::processBlock (juce::AudioBuffer<float>& buffe
         const auto event = midiMessage.getMessage();
         const int eventSample = static_cast<int>(midiMessage.samplePosition);//returns number of samples from the start
 
+        if (event.isNoteOn()) {
+            //load atomic pointers (which point to apvts parameters) into local adsr params struct for use in synth
+
+            adsrParams.attack = attackParam->load();
+            adsrParams.decay = decayParam->load();
+            adsrParams.sustain = sustainParam->load();
+            adsrParams.release = releaseParam->load();
+            //pass local stuct into synth
+            synth.setAdsrParams(adsrParams);
+        }
+
         synth.renderAndAppend(buffer, currentSample, eventSample);
         synth.handleMidiEvent(event);
 
         currentSample = eventSample;
-
-        
 	}
     synth.renderAndAppend(buffer, currentSample, buffer.getNumSamples());
 }
@@ -162,7 +177,8 @@ bool WavetableSynthAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* WavetableSynthAudioProcessor::createEditor()
 {
-    return new WavetableSynthAudioProcessorEditor (*this);
+    //return new WavetableSynthAudioProcessorEditor (*this);
+	return new juce::GenericAudioProcessorEditor(*this);
 }
 
 //==============================================================================
@@ -171,12 +187,19 @@ void WavetableSynthAudioProcessor::getStateInformation (juce::MemoryBlock& destD
     // You should use this method to store your parameters in the memory block.
     // You could do that either as raw data, or use the XML or ValueTree classes
     // as intermediaries to make it easy to save and load complex data.
+    juce::MemoryOutputStream stream(destData, true);
+    apvts.state.writeToStream(stream);
 }
 
 void WavetableSynthAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     // You should use this method to restore your parameters from this memory block,
     // whose contents will have been created by the getStateInformation() call.
+    juce::ValueTree tree = juce::ValueTree::readFromData(data, sizeInBytes);
+    if (tree.isValid())
+    {
+        apvts.replaceState(tree);
+    }
 }
 
 //==============================================================================
@@ -184,4 +207,29 @@ void WavetableSynthAudioProcessor::setStateInformation (const void* data, int si
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new WavetableSynthAudioProcessor();
+}
+juce::AudioProcessorValueTreeState::ParameterLayout WavetableSynthAudioProcessor::createParameterLayout() {
+    juce::AudioProcessorValueTreeState::ParameterLayout pl;
+    pl.add(
+        std::make_unique<juce::AudioParameterFloat>("attack", // parameterID                          
+        "Attack", // parameter name
+        juce::NormalisableRange<float>(0.0f, 5.0f, 0.01f, 0.5f),
+        0.0f,
+        "sec"),
+        std::make_unique<juce::AudioParameterFloat>("decay", // parameterID                          
+            "Decay", // parameter name
+            juce::NormalisableRange<float>(0.0f, 5.0f, 0.01f, 0.5f),
+            1.0f,
+            "sec"),
+        std::make_unique<juce::AudioParameterFloat>("sustain", // parameterID                          
+            "Sustain", // parameter name
+            juce::NormalisableRange<float>(0.0f, 5.0f, 0.01f, 0.5f),
+            0.0f,
+            "sec"),
+        std::make_unique<juce::AudioParameterFloat>("release", // parameterID                          
+            "Release", // parameter name
+            juce::NormalisableRange<float>(0.0f, 5.0f, 0.01f, 0.5f),
+            1.0f,
+            "sec"));
+    return pl;  
 }

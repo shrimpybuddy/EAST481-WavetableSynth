@@ -4,9 +4,11 @@
 
 //index inc is freq * length /sampleRate
 
-WavetableOsc::WavetableOsc(std::vector<float> table, double sr)
-	: wavetable(std::move(table)), sampleRate(sr), indexInc(0.f)
+WavetableOsc::WavetableOsc(std::vector<float> table, double sr, juce::ADSR::Parameters &adsrParams)
+	: wavetable(std::move(table)), sampleRate(sr), indexInc(0.f), frequency(0.f)
 {
+	adsr.setSampleRate(sr);
+	this->adsr.setParameters(adsrParams);
 }
 
 void WavetableOsc::setFrequency(double freq)
@@ -24,7 +26,7 @@ float WavetableOsc::getSample() {
 	if (index >= wavetable.size()) {
 		index -= wavetable.size();
 	}
-	return sample;
+	return (sample * adsr.getNextSample());
 }
 
 float WavetableOsc::linearInterp(float idx) {
@@ -36,16 +38,30 @@ float WavetableOsc::linearInterp(float idx) {
 
 	//return (wavetable[leftSampleIdx] * leftWeight) + (wavetable[rightSampleIdx] * rightWeight);
 	return wavetable[leftSampleIdx] + rightWeight * (wavetable[rightSampleIdx] - wavetable[leftSampleIdx]);
-
-
-
 }
+void WavetableOsc::noteOnResetIndex() {
+	index = 0.0;
+	
+	adsr.noteOn();
+}
+void WavetableOsc::noteOn() {
+	adsr.noteOn();
+}
+void WavetableOsc::noteOff() {
+	adsr.noteOff();
+}	
 void WavetableOsc::stop() {
 	index = 0.f;
 	indexInc = 0.f;
 }
 bool WavetableOsc::isPlaying() {
-	return (indexInc != 0.f);
+	return (adsr.isActive());
+}
+bool WavetableOsc::isActiveButNotPlaying() {
+	return (indexInc != 0.f && !adsr.isActive());
+}
+void WavetableOsc::setAdsrParamsOsc(const juce::ADSR::Parameters& params) {
+	adsr.setParameters(params);
 }
 
 

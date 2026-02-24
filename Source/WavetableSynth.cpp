@@ -1,8 +1,10 @@
 #include "WavetableSynth.h"
 #include <cmath>
-WavetableSynth::WavetableSynth(double sr) :
-	sampleRate(sr)
-{}
+WavetableSynth::WavetableSynth() = default;
+WavetableSynth::WavetableSynth(double sr, juce::ADSR::Parameters &params) :
+	sampleRate(sr), adsrParams(params)
+{
+}
 void WavetableSynth::handleMidiEvent(juce::MidiMessage event) {
 	//getNoteNumber returns an int from 0 - 127, where 60 is middle C
 	//each index in our oscillator vector corresponds to a midi note number
@@ -11,21 +13,32 @@ void WavetableSynth::handleMidiEvent(juce::MidiMessage event) {
 		auto noteNumber = event.getNoteNumber();
 		auto frequency = juce::MidiMessage::getMidiNoteInHertz(noteNumber);
 		oscillators[noteNumber].setFrequency(frequency);
+		
+
+		if (oscillators[noteNumber].isPlaying()) {
+			oscillators[noteNumber].noteOn();
+		}
+
+		else {
+			oscillators[noteNumber].noteOnResetIndex();
+		}
+
 	}
 	else if (event.isAllNotesOff()) {
 		for (auto& osc : oscillators) {
-			osc.stop();
+			osc.noteOff();
 		}
 	}
 	else if (event.isNoteOff())
 	{
 		auto noteNumber = event.getNoteNumber();
-		oscillators[noteNumber].stop();
+		oscillators[noteNumber].noteOff();
 	}
 
 }
 void WavetableSynth::setSampleRate(double sr) {
 	this->sampleRate = sr;
+
 }
 
 std::vector<float> WavetableSynth::generateSineTable() {
@@ -41,6 +54,8 @@ std::vector<float> WavetableSynth::generateSineTable() {
 }
 
 void WavetableSynth::initOscs() {
+	normalizationSmooth.reset(sampleRate, 0.01f);
+
 	//polyphonic, up to 128 keys pressed, 128 different oscillators
 	int numOscs = 128;
 
@@ -50,29 +65,35 @@ void WavetableSynth::initOscs() {
 	oscillators.clear();
 	for (int i = 0; i < numOscs; i++) {
 		//emplaceback takes constructor arguments for WavetableOsc and constructs them in place
-		oscillators.emplace_back(sineTable, sampleRate);
+		oscillators.emplace_back(sineTable, sampleRate, adsrParams);
 	}
 }
 
 void WavetableSynth::renderAndAppend(juce::AudioBuffer<float>& buffer, int currentSample, int eventSample) {
-
-	//render audio from current sample to event sample
-	for (int sample = currentSample; sample < eventSample; sample++) {
-
-		float i = 0; //keep track of how many oscillators are playing for normalization
-
-		for (auto& osc : oscillators) {
-			if (osc.isPlaying()) {
+	float i = 0; //keep track of how many oscillators are playing for normalization
+	for (auto& osc : oscillators) {
+		if (osc.isPlaying()) {
+			if(osc.isActiveButNotPlaying()) {
+				osc.stop(); //stop oscillators that have finished their release phase
+			}
+			else{
 				i++;
 			}
 		}
-		i = sqrt(i); //normalize by square root of number of oscillators playing
+	}
+	normalizationSmooth.setTargetValue(sqrt(i));
 
+	//render audio from current sample to event sample
+	
+	for (int sample = currentSample; sample < eventSample; sample++) {
+
+		if (i == 0) {
+			continue; //if no oscillators are playing, skip to next sample
+		}
 		float output = 0.0f;
 		for (auto& osc : oscillators) {
 			if (osc.isPlaying()) {
-				i++;
-				output += (osc.getSample()/i);
+				output += (osc.getSample()/normalizationSmooth.getNextValue());
 			}
 		}
 
@@ -81,5 +102,14 @@ void WavetableSynth::renderAndAppend(juce::AudioBuffer<float>& buffer, int curre
 			//append output to all channels using write pointer
 			buffer.getWritePointer(channel)[sample] += output;
 		}
+	}
+}
+void WavetableSynth::setAdsrParams(juce::ADSR::Parameters& params){
+	this->adsrParams = params;
+	for (auto& osc : oscillators) {
+		if (!osc.isPlaying()) {
+			osc.setAdsrParamsOsc(params);
+		}
+		
 	}
 }
